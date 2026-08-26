@@ -1,12 +1,14 @@
-from app.pipeline.validation import (
-    SubmissionValidationService,
-)
+from copy import deepcopy
+from typing import Any
 
 
-def create_valid_submission() -> dict:
+def create_valid_submission() -> dict[str, Any]:
     """
-    Return a valid Kobo submission using the real field structure
-    of the deployed form.
+    Return a valid Kobo submission matching the structure of the
+    deployed digital activity monitoring form.
+
+    Each call returns a new dictionary so tests can safely modify
+    the submission without affecting other tests.
     """
 
     return {
@@ -78,27 +80,10 @@ def create_valid_submission() -> dict:
     }
 
 
-def test_accepts_valid_submission() -> None:
+def create_invalid_gender_total_submission() -> dict[str, Any]:
     """
-    A valid submission should be accepted.
-    """
-
-    service = SubmissionValidationService()
-
-    result = service.process(
-        [create_valid_submission()]
-    )
-
-    assert result.total_records == 1
-
-    assert result.accepted_count == 1
-
-    assert result.rejected_count == 0
-
-
-def test_rejects_invalid_participant_totals() -> None:
-    """
-    A submission with inconsistent gender totals should be rejected.
+    Return a submission where male and female participant totals
+    do not equal actual participants.
     """
 
     submission = create_valid_submission()
@@ -107,71 +92,68 @@ def test_rejects_invalid_participant_totals() -> None:
         "participant_information/male_participants"
     ] = 80
 
-    service = SubmissionValidationService()
-
-    result = service.process(
-        [submission]
-    )
-
-    assert result.total_records == 1
-
-    assert result.accepted_count == 0
-
-    assert result.rejected_count == 1
-
-    assert (
-        result.rejected_records[0]
-        .submission_reference
-        == "submission-uuid-123"
-    )
+    return submission
 
 
-def test_continues_when_one_submission_fails() -> None:
+def create_invalid_age_total_submission() -> dict[str, Any]:
     """
-    One invalid record must not prevent valid records in the same
-    batch from being processed.
-    """
-
-    valid_submission = create_valid_submission()
-
-    invalid_submission = create_valid_submission()
-
-    invalid_submission["_uuid"] = (
-        "invalid-submission"
-    )
-
-    invalid_submission[
-        "participant_information/"
-        "actual_participants"
-    ] = 100
-
-    service = SubmissionValidationService()
-
-    result = service.process(
-        [
-            valid_submission,
-            invalid_submission,
-        ]
-    )
-
-    assert result.total_records == 2
-
-    assert result.accepted_count == 1
-
-    assert result.rejected_count == 1
-
-
-def test_cancelled_activity_uses_zero_participants() -> None:
-    """
-    Cancelled activities should not require participant fields.
-
-    The transformation layer normalizes participant statistics
-    to zero for activities that were not completed.
+    Return a submission where youth and adult participant totals
+    do not equal actual participants.
     """
 
     submission = create_valid_submission()
 
-    submission["_uuid"] = "cancelled-activity"
+    submission[
+        "participant_information/youth_participants"
+    ] = 80
+
+    return submission
+
+
+def create_invalid_achievement_submission() -> dict[str, Any]:
+    """
+    Return a submission with an incorrect participant
+    achievement percentage.
+    """
+
+    submission = create_valid_submission()
+
+    submission[
+        "participant_information/"
+        "participant_achievement_percentage"
+    ] = 75
+
+    return submission
+
+
+def create_unconfirmed_submission() -> dict[str, Any]:
+    """
+    Return a submission that was not confirmed by the
+    field officer.
+    """
+
+    submission = create_valid_submission()
+
+    submission[
+        "verification/confirm_information"
+    ] = "no"
+
+    return submission
+
+
+def create_cancelled_submission() -> dict[str, Any]:
+    """
+    Return a cancelled activity without participant information.
+
+    The transformation layer is expected to normalize participant
+    values to zero for activities that were not completed.
+    """
+
+    submission = create_valid_submission()
+
+    submission["_uuid"] = (
+        "cancelled-submission-uuid"
+    )
 
     submission[
         "activity_information/activity_status"
@@ -190,26 +172,4 @@ def test_cancelled_activity_uses_zero_participants() -> None:
     for field in participant_fields:
         submission.pop(field)
 
-    service = SubmissionValidationService()
-
-    result = service.process(
-        [submission]
-    )
-
-    assert result.accepted_count == 1
-
-    accepted = result.accepted_records[0]
-
-    assert (
-        accepted.submission.participant_data.actual_participants == 0
-    )
-
-    assert (
-        accepted.submission.participant_data.male_participants
-        == 0
-    )
-
-    assert (
-        accepted.submission.participant_data.female_participants
-        == 0
-    )
+    return submission
