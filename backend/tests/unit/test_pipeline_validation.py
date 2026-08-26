@@ -95,26 +95,26 @@ def test_cancelled_activity_uses_zero_participants() -> None:
     accepted = result.accepted_records[0]
 
     assert (
-        accepted.participant_data.actual_participants
+        accepted.submission.participant_data.actual_participants
         == 0
     )
 
     assert (
-        accepted.participant_data.male_participants
+        accepted.submission.participant_data.male_participants
         == 0
     )
 
     assert (
-        accepted.participant_data.female_participants
+        accepted.submission.participant_data.female_participants
         == 0
     )
 
     assert (
-        accepted.participant_data.youth_participants
+        accepted.submission.participant_data.youth_participants
         == 0
     )
 
     assert (
-        accepted.participant_data.adult_participants
+        accepted.submission.participant_data.adult_participants
         == 0
     )
