@@ -843,11 +843,11 @@ This helps ensure that changes are tested before being merged or deployed.
 
 ## Phase 6 — Data Quality Framework
 
-* [ ] Define validation rules
-* [ ] Detect duplicate records
-* [ ] Detect missing values
-* [ ] Log quality issues
-* [ ] Calculate quality metrics
+* [x] Define validation rules
+* [x] Detect duplicate records
+* [x] Detect missing values
+* [x] Log quality issues
+* [x] Calculate quality metrics
 
 ## Phase 7 — SQL Monitoring Layer
 
