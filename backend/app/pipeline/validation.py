@@ -6,6 +6,7 @@ from app.kobo.transformer import (
     transform_submission,
 )
 from app.schemas.pipeline import (
+    AcceptedSubmission,
     PipelineResult,
     RejectedSubmission,
 )
@@ -52,10 +53,16 @@ class SubmissionValidationService:
         """
         Process one raw Kobo submission.
 
-        Successful records are added to accepted_records.
+        Successful records preserve both:
 
-        Failed records are added to rejected_records along
-        with their raw payload and error information.
+        - the normalized KoboSubmission;
+        - the original raw Kobo payload.
+
+        Failed records preserve:
+
+        - the submission reference;
+        - the validation error;
+        - the original raw payload.
         """
 
         submission_reference = (
@@ -69,7 +76,10 @@ class SubmissionValidationService:
             )
 
             result.accepted_records.append(
-                submission
+                AcceptedSubmission(
+                    submission=submission,
+                    raw_submission=raw_submission,
+                )
             )
 
         except KoboTransformationError as error:

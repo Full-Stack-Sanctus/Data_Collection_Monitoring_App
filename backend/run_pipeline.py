@@ -1,19 +1,22 @@
-from app.core.config import settings
-from app.kobo.client import KoboAPIError, KoboClient
-from app.pipeline.extractor import ExtractionError
-from app.pipeline.service import KoboPipelineService
-
 import json
 
+from app.core.config import settings
+from app.database.session import SessionLocal
+from app.kobo.client import KoboAPIError, KoboClient
+from app.pipeline.extractor import ExtractionError
 from app.pipeline.report import DataQualityReporter
+from app.pipeline.service import KoboPipelineService
 
 
 def main() -> None:
     """
-    Execute the Kobo extraction and validation pipeline.
+    Execute the complete Kobo extraction, validation, data quality,
+    and database loading pipeline.
     """
 
     client = KoboClient()
+
+    db = SessionLocal()
 
     try:
         pipeline = KoboPipelineService(
@@ -23,9 +26,15 @@ def main() -> None:
             ),
         )
 
-        result, archive_path = pipeline.run()
-        
-                reporter = DataQualityReporter()
+        (
+            result,
+            archive_path,
+            database_result,
+        ) = pipeline.run(
+            session=db,
+        )
+
+        reporter = DataQualityReporter()
 
         quality_report = reporter.build_report(
             result
@@ -39,12 +48,11 @@ def main() -> None:
                 indent=2,
             )
         )
-        
 
         print("\nKobo Pipeline Completed\n")
 
         print(
-            f"Total records: "
+            f"Total records extracted: "
             f"{result.total_records}"
         )
 
@@ -56,6 +64,28 @@ def main() -> None:
         print(
             f"Rejected records: "
             f"{result.rejected_count}"
+        )
+
+        print("\nDatabase Loading Results:")
+
+        print(
+            f"Accepted records inserted: "
+            f"{database_result.accepted_inserted}"
+        )
+
+        print(
+            f"Rejected records persisted: "
+            f"{database_result.rejected_persisted}"
+        )
+
+        print(
+            f"Skipped records: "
+            f"{database_result.skipped_records}"
+        )
+
+        print(
+            f"Database failures: "
+            f"{database_result.failed_records}"
         )
 
         print(
@@ -79,6 +109,24 @@ def main() -> None:
                     f"{rejected.error}"
                 )
 
+        if database_result.failures:
+            print(
+                "\nDatabase Failure Details:"
+            )
+
+            for failure in (
+                database_result.failures
+            ):
+                print(
+                    f"\nReference: "
+                    f"{failure.submission_reference}"
+                )
+
+                print(
+                    f"Error: "
+                    f"{failure.error}"
+                )
+
     except (
         KoboAPIError,
         ExtractionError,
@@ -90,6 +138,8 @@ def main() -> None:
         print(error)
 
     finally:
+        db.close()
+
         client.close()
 
 

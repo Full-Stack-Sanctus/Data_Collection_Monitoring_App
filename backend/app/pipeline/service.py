@@ -1,18 +1,24 @@
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 from app.kobo.client import KoboClient
 from app.pipeline.extractor import KoboSubmissionExtractor
 from app.pipeline.validation import (
     SubmissionValidationService,
 )
+from app.schemas.load_result import DatabaseLoadResult
 from app.schemas.pipeline import PipelineResult
+from app.services.submission_loader import (
+    SubmissionLoader,
+)
 
 
 class KoboPipelineService:
     """
-    Coordinates the Kobo extraction and validation workflow.
+    Coordinates the complete Kobo data pipeline.
 
-    Current pipeline:
+    Pipeline:
 
         Kobo API
             ↓
@@ -22,15 +28,20 @@ class KoboPipelineService:
             ↓
         Transform + Validate
             ↓
-        Accepted / Rejected Records
-
-    Database loading will be added in a later phase.
+        PipelineResult
+            ↓
+        PostgreSQL Loading
+            ↓
+        Normalized Database Records
     """
 
     def __init__(
         self,
         client: KoboClient,
         raw_data_directory: Path,
+        submission_loader: (
+            SubmissionLoader | None
+        ) = None,
     ) -> None:
         self.extractor = KoboSubmissionExtractor(
             client=client,
@@ -39,16 +50,29 @@ class KoboPipelineService:
 
         self.validator = SubmissionValidationService()
 
+        self.submission_loader = (
+            submission_loader
+            or SubmissionLoader()
+        )
+
     def run(
         self,
+        *,
+        session: Session,
         asset_uid: str | None = None,
-    ) -> tuple[PipelineResult, Path]:
+    ) -> tuple[
+        PipelineResult,
+        Path,
+        DatabaseLoadResult,
+    ]:
         """
-        Execute one extraction and validation pipeline run.
+        Execute one complete Kobo pipeline run.
 
         Returns:
-            - The validation result.
-            - The location of the raw data archive.
+
+            - Validation result.
+            - Raw archive path.
+            - Database loading result.
         """
 
         raw_submissions = self.extractor.extract(
@@ -61,8 +85,19 @@ class KoboPipelineService:
             )
         )
 
-        result = self.validator.process(
+        pipeline_result = self.validator.process(
             raw_submissions
         )
 
-        return result, archive_path
+        database_result = (
+            self.submission_loader.load(
+                session=session,
+                pipeline_result=pipeline_result,
+            )
+        )
+
+        return (
+            pipeline_result,
+            archive_path,
+            database_result,
+        )
