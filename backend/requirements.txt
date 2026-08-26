@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg[binary]
+pydantic-settings
+alembic
+pandas
+httpx
+requests>=2.32,<3.0
