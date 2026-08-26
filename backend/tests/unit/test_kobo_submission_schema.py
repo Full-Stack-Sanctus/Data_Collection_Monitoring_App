@@ -1,9 +1,9 @@
 import pytest
 
-from app.kobo.transformer import transform_submission
+from app.kobo.transformer import KoboTransformationError, transform_submission
 from tests.fixtures.kobo_submissions import (
-    create_invalid_age_total_submission,
     create_invalid_achievement_submission,
+    create_invalid_age_total_submission,
     create_invalid_gender_total_submission,
     create_unconfirmed_submission,
     create_valid_submission,
@@ -15,9 +15,7 @@ def test_valid_submission_passes_business_rules() -> None:
     A valid submission should successfully pass all business rules.
     """
 
-    submission = transform_submission(
-        create_valid_submission()
-    )
+    submission = transform_submission(create_valid_submission())
 
     submission.validate_business_rules()
 
@@ -28,18 +26,11 @@ def test_rejects_invalid_gender_totals() -> None:
     of actual participants.
     """
 
-    submission = transform_submission(
-        create_invalid_gender_total_submission()
-    )
-
     with pytest.raises(
-        ValueError,
-        match=(
-            "Male and female participants must equal "
-            "actual participants"
-        ),
+        KoboTransformationError,
+        match="Male and female participants must equal actual participants",
     ):
-        submission.validate_business_rules()
+        transform_submission(create_invalid_gender_total_submission())
 
 
 def test_rejects_invalid_age_totals() -> None:
@@ -47,18 +38,11 @@ def test_rejects_invalid_age_totals() -> None:
     Youth and adult participant totals must equal actual participants.
     """
 
-    submission = transform_submission(
-        create_invalid_age_total_submission()
-    )
-
     with pytest.raises(
-        ValueError,
-        match=(
-            "Youth and adult participants must equal "
-            "actual participants"
-        ),
+        KoboTransformationError,
+        match="Youth and adult participants must equal actual participants",
     ):
-        submission.validate_business_rules()
+        transform_submission(create_invalid_age_total_submission())
 
 
 def test_rejects_invalid_achievement_percentage() -> None:
@@ -67,18 +51,14 @@ def test_rejects_invalid_achievement_percentage() -> None:
     value from actual and target participants.
     """
 
-    submission = transform_submission(
-        create_invalid_achievement_submission()
-    )
-
     with pytest.raises(
-        ValueError,
+        KoboTransformationError,
         match=(
-            "Participant achievement percentage does not "
-            "match target and actual participants"
+            "Participant achievement percentage does not match "
+            "target and actual participants"
         ),
     ):
-        submission.validate_business_rules()
+        transform_submission(create_invalid_achievement_submission())
 
 
 def test_rejects_unconfirmed_submission() -> None:
@@ -87,7 +67,8 @@ def test_rejects_unconfirmed_submission() -> None:
     accepted into the monitoring system.
     """
 
-    with pytest.raises(ValueError):
-        transform_submission(
-            create_unconfirmed_submission()
-        )
+    with pytest.raises(
+        KoboTransformationError,
+        match="Kobo submission was not confirmed by the respondent",
+    ):
+        transform_submission(create_unconfirmed_submission())
