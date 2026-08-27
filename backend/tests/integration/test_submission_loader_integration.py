@@ -205,6 +205,9 @@ def test_duplicate_submission_is_skipped(
     assert second_result.skipped_records == 1
 
     assert second_result.failed_records == 0
+    
+    # Reset the transaction state to clear any duplicate checking side-effects
+    db_session.rollback()
 
     raw_submissions = db_session.scalars(
         select(RawSubmission).where(
