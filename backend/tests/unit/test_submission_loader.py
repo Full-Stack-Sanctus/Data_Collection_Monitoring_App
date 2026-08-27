@@ -56,9 +56,12 @@ def test_load_skips_duplicate_submission(
     mocker,
 ) -> None:
     """
-    Verify that the loader rolls back and counts a record as skipped
-    when the underlying loading operation reports that the submission
+    Verify that the loader counts a record as skipped when the
+    underlying loading operation reports that the submission
     already exists.
+
+    A skipped record does not represent a database failure, so the
+    transaction must not be rolled back.
     """
 
     validator = SubmissionValidationService()
@@ -90,7 +93,10 @@ def test_load_skips_duplicate_submission(
 
     assert result.failed_records == 0
 
-    mock_session.rollback.assert_called_once()
+    mock_session.commit.assert_not_called()
+
+    mock_session.rollback.assert_not_called()
+    
 
 
 def test_load_result_counts_rejected_submission(
