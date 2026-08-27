@@ -88,6 +88,7 @@ def create_activity(
         female_participants=female_participants,
         youth_participants=youth_participants,
         adult_participants=adult_participants,
+        datetime.now(timezone.utc),),
     )
 
     session.add(activity)
