@@ -168,6 +168,9 @@ def test_duplicate_submission_is_skipped(
     Verify that processing the same Kobo submission twice does not
     create duplicate database records.
     """
+    
+    # 1. Clear session cache to guarantee isolation from previous tests
+    db_session.rollback()
 
     raw_submission = create_unique_submission()
 
