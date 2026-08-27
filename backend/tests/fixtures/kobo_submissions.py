@@ -2,7 +2,8 @@ from copy import deepcopy
 from typing import Any
 
 
-def create_valid_submission() -> dict[str, Any]:
+def create_valid_submission(submission_uuid: str = "submission-uuid-123",
+) -> dict[str, Any]:
     """
     Return a valid Kobo submission matching the structure of the
     deployed digital activity monitoring form.
@@ -24,7 +25,7 @@ def create_valid_submission() -> dict[str, Any]:
         "device_id": "device-123",
         "username": "test-user",
         "instance_id": "uuid:instance-123",
-        "_uuid": "submission-uuid-123",
+        "_uuid": submission_uuid,
         "_xform_id_string": "form-id-123",
         "_submission_time": (
             "2026-08-25T13:23:16"
