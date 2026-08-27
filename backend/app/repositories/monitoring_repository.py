@@ -6,23 +6,23 @@ from app.models.activity import Activity
 
 class MonitoringRepository:
     """
-    Provides database aggregation queries for program monitoring.
+    Provides aggregated monitoring data from activity records.
 
-    This repository is responsible only for retrieving aggregated
-    monitoring data from the normalized Activity records.
+    This repository is responsible only for database queries and
+    aggregation. Business calculations are handled by the monitoring
+    service layer.
     """
 
-    def get_summary(
+    def get_summary_totals(
         self,
         session: Session,
     ) -> dict[str, int]:
         """
-        Retrieve the aggregated values required to build the
-        high-level monitoring summary.
+        Retrieve high-level activity and participant totals.
 
-        The repository returns raw aggregate values. Percentage
-        calculations and other business logic belong in the
-        monitoring service layer.
+        The aggregation is performed directly by PostgreSQL so that
+        the application does not need to load every Activity record
+        into memory before calculating monitoring totals.
         """
 
         statement = select(
@@ -115,44 +115,36 @@ class MonitoringRepository:
             ),
         )
 
-        row = session.execute(
+        result = session.execute(
             statement
         ).mappings().one()
 
         return {
-            "total_activities": int(
-                row["total_activities"]
+            "total_activities": (
+                result["total_activities"]
             ),
-
-            "completed_activities": int(
-                row["completed_activities"]
+            "completed_activities": (
+                result["completed_activities"]
             ),
-
-            "cancelled_activities": int(
-                row["cancelled_activities"]
+            "cancelled_activities": (
+                result["cancelled_activities"]
             ),
-
-            "total_target_participants": int(
-                row["total_target_participants"]
+            "total_target_participants": (
+                result["total_target_participants"]
             ),
-
-            "total_actual_participants": int(
-                row["total_actual_participants"]
+            "total_actual_participants": (
+                result["total_actual_participants"]
             ),
-
-            "total_male_participants": int(
-                row["total_male_participants"]
+            "total_male_participants": (
+                result["total_male_participants"]
             ),
-
-            "total_female_participants": int(
-                row["total_female_participants"]
+            "total_female_participants": (
+                result["total_female_participants"]
             ),
-
-            "total_youth_participants": int(
-                row["total_youth_participants"]
+            "total_youth_participants": (
+                result["total_youth_participants"]
             ),
-
-            "total_adult_participants": int(
-                row["total_adult_participants"]
+            "total_adult_participants": (
+                result["total_adult_participants"]
             ),
         }

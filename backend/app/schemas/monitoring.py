@@ -13,8 +13,6 @@ class MonitoringSummary(BaseModel):
 
     completed_activities: int
 
-    planned_activities: int
-
     cancelled_activities: int
 
     total_target_participants: int
