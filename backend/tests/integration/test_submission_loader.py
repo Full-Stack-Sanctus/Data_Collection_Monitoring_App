@@ -14,7 +14,7 @@ from app.pipeline.validation import (
 from app.services.submission_loader import (
     SubmissionLoader,
 )
-from app.tests.fixtures.kobo_submissions import (
+from tests.fixtures.kobo_submissions import (
     create_valid_submission,
 )
 
