@@ -165,8 +165,6 @@ class SubmissionLoader:
                 result.accepted_inserted += 1
 
             elif status == "skipped":
-                session.rollback()
-
                 result.skipped_records += 1
 
         except IntegrityError as error:
@@ -220,8 +218,6 @@ class SubmissionLoader:
                 result.rejected_persisted += 1
 
             elif status == "skipped":
-                session.rollback()
-
                 result.skipped_records += 1
 
         except IntegrityError as error:
