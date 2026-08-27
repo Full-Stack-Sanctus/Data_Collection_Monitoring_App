@@ -1,3 +1,8 @@
+import pytest
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -78,54 +83,6 @@ def create_unique_submission() -> dict:
     return submission
 
 
-def cleanup_submission(
-    session: Session,
-    external_submission_id: str,
-) -> None:
-    """
-    Remove records created during an integration test.
-
-    The cleanup begins with records that depend on RawSubmission,
-    then removes the raw submission itself.
-
-    Lookup entities are also removed when they were uniquely created
-    by the integration test.
-    """
-
-    raw_submission = session.scalar(
-        select(RawSubmission).where(
-            RawSubmission.external_submission_id
-            == external_submission_id
-        )
-    )
-
-    if raw_submission is not None:
-
-        activities = session.scalars(
-            select(Activity).where(
-                Activity.raw_submission_id
-                == raw_submission.id
-            )
-        ).all()
-
-        for activity in activities:
-            session.delete(activity)
-
-        issues = session.scalars(
-            select(DataQualityIssue).where(
-                DataQualityIssue.raw_submission_id
-                == raw_submission.id
-            )
-        ).all()
-
-        for issue in issues:
-            session.delete(issue)
-
-        session.delete(raw_submission)
-
-        session.commit()
-
-
 def test_valid_submission_is_persisted(
     db_session: Session,
 ) -> None:
@@ -142,73 +99,66 @@ def test_valid_submission_is_persisted(
 
     loader = SubmissionLoader()
 
-    try:
-        pipeline_result = validator.process(
-            [raw_submission]
+    pipeline_result = validator.process(
+        [raw_submission]
+    )
+
+    assert pipeline_result.accepted_count == 1
+
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
+
+    assert load_result.total_records == 1
+
+    assert load_result.accepted_inserted == 1
+
+    assert load_result.rejected_persisted == 0
+
+    assert load_result.skipped_records == 0
+
+    assert load_result.failed_records == 0
+
+    persisted_raw_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == external_submission_id
         )
+    )
 
-        assert pipeline_result.accepted_count == 1
+    assert persisted_raw_submission is not None
 
-        load_result = loader.load(
-            session=db_session,
-            pipeline_result=pipeline_result,
+    assert (
+        persisted_raw_submission.source
+        == "kobotoolbox"
+    )
+
+    assert (
+        persisted_raw_submission.processing_status
+        == "processed"
+    )
+
+    activity = db_session.scalar(
+        select(Activity).where(
+            Activity.raw_submission_id
+            == persisted_raw_submission.id
         )
+    )
 
-        assert load_result.total_records == 1
+    assert activity is not None
 
-        assert load_result.accepted_inserted == 1
+    assert activity.activity_title == (
+        "Python Training"
+    )
 
-        assert load_result.rejected_persisted == 0
+    assert activity.target_participants == 100
 
-        assert load_result.skipped_records == 0
+    assert activity.actual_participants == 90
 
-        assert load_result.failed_records == 0
+    assert activity.male_participants == 50
 
-        persisted_raw_submission = db_session.scalar(
-            select(RawSubmission).where(
-                RawSubmission.external_submission_id
-                == external_submission_id
-            )
-        )
-
-        assert persisted_raw_submission is not None
-
-        assert (
-            persisted_raw_submission.source
-            == "kobotoolbox"
-        )
-
-        assert (
-            persisted_raw_submission.processing_status
-            == "processed"
-        )
-
-        activity = db_session.scalar(
-            select(Activity).where(
-                Activity.raw_submission_id
-                == persisted_raw_submission.id
-            )
-        )
-
-        assert activity is not None
-
-        assert activity.activity_title == (
-            "Python Training"
-        )
-
-        assert activity.target_participants == 100
-
-        assert activity.actual_participants == 90
-
-        assert activity.male_participants == 50
-
-        assert activity.female_participants == 40
-
-    finally:
-        cleanup_submission(
-            db_session,
-            external_submission_id,
-        )
+    assert activity.female_participants == 40
         
         
 def test_duplicate_submission_is_skipped(
@@ -227,47 +177,41 @@ def test_duplicate_submission_is_skipped(
 
     loader = SubmissionLoader()
 
-    try:
-        pipeline_result = validator.process(
-            [raw_submission]
+    pipeline_result = validator.process(
+        [raw_submission]
+    )
+
+    first_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
+
+    assert first_result.accepted_inserted == 1
+
+    second_pipeline_result = validator.process(
+        [raw_submission]
+    )
+
+    second_result = loader.load(
+        session=db_session,
+        pipeline_result=second_pipeline_result,
+    )
+
+    assert second_result.accepted_inserted == 0
+
+    assert second_result.skipped_records == 1
+
+    assert second_result.failed_records == 0
+
+    raw_submissions = db_session.scalars(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == external_submission_id
         )
+    ).all()
 
-        first_result = loader.load(
-            session=db_session,
-            pipeline_result=pipeline_result,
-        )
-
-        assert first_result.accepted_inserted == 1
-
-        second_pipeline_result = validator.process(
-            [raw_submission]
-        )
-
-        second_result = loader.load(
-            session=db_session,
-            pipeline_result=second_pipeline_result,
-        )
-
-        assert second_result.accepted_inserted == 0
-
-        assert second_result.skipped_records == 1
-
-        assert second_result.failed_records == 0
-
-        raw_submissions = db_session.scalars(
-            select(RawSubmission).where(
-                RawSubmission.external_submission_id
-                == external_submission_id
-            )
-        ).all()
-
-        assert len(raw_submissions) == 1
-
-    finally:
-        cleanup_submission(
-            db_session,
-            external_submission_id,
-        )      
+    assert len(raw_submissions) == 1
+    
         
 def test_rejected_submission_is_preserved_with_issue(
     db_session: Session,
@@ -293,67 +237,62 @@ def test_rejected_submission_is_preserved_with_issue(
 
     loader = SubmissionLoader()
 
-    try:
-        pipeline_result = validator.process(
-            [raw_submission]
+    pipeline_result = validator.process(
+        [raw_submission]
+    )
+
+    assert pipeline_result.accepted_count == 0
+
+    assert pipeline_result.rejected_count == 1
+
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
+
+    assert load_result.total_records == 1
+
+    assert load_result.accepted_inserted == 0
+
+    assert load_result.rejected_persisted == 1
+
+    assert load_result.failed_records == 0
+
+    persisted_raw_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == external_submission_id
         )
+    )
 
-        assert pipeline_result.accepted_count == 0
+    assert persisted_raw_submission is not None
 
-        assert pipeline_result.rejected_count == 1
+    assert (
+        persisted_raw_submission.processing_status
+        == "failed"
+    )
 
-        load_result = loader.load(
-            session=db_session,
-            pipeline_result=pipeline_result,
+    issue = db_session.scalar(
+        select(DataQualityIssue).where(
+            DataQualityIssue.raw_submission_id
+            == persisted_raw_submission.id
         )
+    )
 
-        assert load_result.total_records == 1
+    assert issue is not None
 
-        assert load_result.accepted_inserted == 0
+    assert (
+        issue.rule_name
+        == "kobo_submission_validation"
+    )
 
-        assert load_result.rejected_persisted == 1
+    assert issue.severity == "error"
 
-        assert load_result.failed_records == 0
+    assert issue.status == "open"
 
-        persisted_raw_submission = db_session.scalar(
-            select(RawSubmission).where(
-                RawSubmission.external_submission_id
-                == external_submission_id
-            )
-        )
-
-        assert persisted_raw_submission is not None
-
-        assert (
-            persisted_raw_submission.processing_status
-            == "failed"
-        )
-
-        issue = db_session.scalar(
-            select(DataQualityIssue).where(
-                DataQualityIssue.raw_submission_id
-                == persisted_raw_submission.id
-            )
-        )
-
-        assert issue is not None
-
-        assert (
-            issue.rule_name
-            == "kobo_submission_validation"
-        )
-
-        assert issue.severity == "error"
-
-        assert issue.status == "open"
-
-        assert issue.issue_description
-
-    finally:
-        cleanup_submission(
-            db_session,
-            external_submission_id,
-        )      
+    assert issue.issue_description
+    
+    
 
 def test_mixed_batch_persists_valid_and_rejected_records(
     db_session: Session,
@@ -388,70 +327,300 @@ def test_mixed_batch_persists_valid_and_rejected_records(
 
     loader = SubmissionLoader()
 
-    try:
-        pipeline_result = validator.process(
-            [
-                valid_submission,
-                invalid_submission,
-            ]
+    pipeline_result = validator.process(
+        [
+            valid_submission,
+            invalid_submission,
+        ]
+    )
+
+    assert pipeline_result.total_records == 2
+
+    assert pipeline_result.accepted_count == 1
+
+    assert pipeline_result.rejected_count == 1
+
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
+
+    assert load_result.total_records == 2
+
+    assert load_result.accepted_inserted == 1
+
+    assert load_result.rejected_persisted == 1
+
+    assert load_result.skipped_records == 0
+
+    assert load_result.failed_records == 0
+
+    valid_raw_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == valid_submission_id
+        )
+    )
+
+    invalid_raw_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == invalid_submission_id
+        )
+    )
+
+    assert valid_raw_submission is not None
+
+    assert invalid_raw_submission is not None
+
+    assert (
+        valid_raw_submission.processing_status
+        == "processed"
+    )
+
+    assert (
+        invalid_raw_submission.processing_status
+        == "failed"
+    )
+    
+    
+def test_database_failure_is_recorded(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify that an unexpected database failure is handled safely.
+
+    The failed submission should:
+
+    - be rolled back;
+    - increment failed_records;
+    - record failure information;
+    - not be reported as successfully inserted.
+    """
+
+    raw_submission = create_unique_submission()
+
+    validator = SubmissionValidationService()
+
+    pipeline_result = validator.process(
+        [raw_submission]
+    )
+
+    assert pipeline_result.accepted_count == 1
+
+    loader = SubmissionLoader()
+
+    def raise_database_error(*args, **kwargs):
+        """
+        Simulate an unexpected failure during raw submission
+        persistence.
+        """
+
+        raise RuntimeError(
+            "Simulated database failure."
         )
 
-        assert pipeline_result.total_records == 2
+    monkeypatch.setattr(
+        loader.raw_submission_repository,
+        "create",
+        raise_database_error,
+    )
 
-        assert pipeline_result.accepted_count == 1
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
 
-        assert pipeline_result.rejected_count == 1
+    assert load_result.total_records == 1
 
-        load_result = loader.load(
-            session=db_session,
-            pipeline_result=pipeline_result,
-        )
+    assert load_result.accepted_inserted == 0
 
-        assert load_result.total_records == 2
+    assert load_result.rejected_persisted == 0
 
-        assert load_result.accepted_inserted == 1
+    assert load_result.skipped_records == 0
 
-        assert load_result.rejected_persisted == 1
+    assert load_result.failed_records == 1
 
-        assert load_result.skipped_records == 0
+    assert len(load_result.failures) == 1
 
-        assert load_result.failed_records == 0
+    failure = load_result.failures[0]
 
-        valid_raw_submission = db_session.scalar(
-            select(RawSubmission).where(
-                RawSubmission.external_submission_id
-                == valid_submission_id
+    assert (
+        failure.submission_reference
+        == raw_submission["_uuid"]
+    )
+
+    assert (
+        failure.error
+        == "Simulated database failure."
+    )    
+    
+
+def test_database_failure_does_not_stop_remaining_records(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify that a database failure for one submission does not
+    prevent later submissions in the same batch from being
+    processed successfully.
+    """
+
+    first_submission = create_unique_submission()
+
+    failing_submission = create_unique_submission()
+
+    successful_submission = create_unique_submission()
+
+    failing_submission_id = (
+        failing_submission["_uuid"]
+    )
+
+    validator = SubmissionValidationService()
+
+    pipeline_result = validator.process(
+        [
+            first_submission,
+            failing_submission,
+            successful_submission,
+        ]
+    )
+
+    assert pipeline_result.accepted_count == 3
+
+    loader = SubmissionLoader()
+
+    original_create = (
+        loader.raw_submission_repository.create
+    )
+
+    def create_with_simulated_failure(
+        session: Session,
+        *,
+        source: str,
+        external_submission_id: str,
+        payload: dict,
+        retrieved_at,
+        processing_status: str = "pending",
+    ):
+        """
+        Fail only for one specific submission.
+
+        All other submissions continue through the real repository
+        implementation.
+        """
+
+        if (
+            external_submission_id
+            == failing_submission_id
+        ):
+            raise RuntimeError(
+                "Simulated database failure."
             )
+
+        return original_create(
+            session,
+            source=source,
+            external_submission_id=(
+                external_submission_id
+            ),
+            payload=payload,
+            retrieved_at=retrieved_at,
+            processing_status=processing_status,
         )
 
-        invalid_raw_submission = db_session.scalar(
-            select(RawSubmission).where(
-                RawSubmission.external_submission_id
-                == invalid_submission_id
-            )
-        )
+    monkeypatch.setattr(
+        loader.raw_submission_repository,
+        "create",
+        create_with_simulated_failure,
+    )
 
-        assert valid_raw_submission is not None
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
 
-        assert invalid_raw_submission is not None
+    assert load_result.total_records == 3
 
-        assert (
-            valid_raw_submission.processing_status
-            == "processed"
-        )
+    assert load_result.accepted_inserted == 2
 
-        assert (
-            invalid_raw_submission.processing_status
-            == "failed"
-        )
+    assert load_result.rejected_persisted == 0
 
-    finally:
-        cleanup_submission(
-            db_session,
-            valid_submission_id,
-        )
+    assert load_result.skipped_records == 0
 
-        cleanup_submission(
-            db_session,
-            invalid_submission_id,
-        )
+    assert load_result.failed_records == 1
+
+    assert len(load_result.failures) == 1
+
+    assert (
+        load_result.failures[0]
+        .submission_reference
+        == failing_submission_id
+    )
+    
+    
+def test_integrity_error_is_recorded(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify that a SQLAlchemy IntegrityError is handled safely and
+    recorded as a database failure.
+    """
+
+    raw_submission = create_unique_submission()
+
+    validator = SubmissionValidationService()
+
+    pipeline_result = validator.process(
+        [raw_submission]
+    )
+
+    loader = SubmissionLoader()
+
+    integrity_error = IntegrityError(
+        statement="INSERT INTO raw_submissions",
+        params={},
+        orig=Exception(
+            "Simulated integrity constraint violation."
+        ),
+    )
+
+    def raise_integrity_error(*args, **kwargs):
+        """
+        Simulate a database integrity constraint failure.
+        """
+
+        raise integrity_error
+
+    monkeypatch.setattr(
+        loader.raw_submission_repository,
+        "create",
+        raise_integrity_error,
+    )
+
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
+
+    assert load_result.total_records == 1
+
+    assert load_result.accepted_inserted == 0
+
+    assert load_result.failed_records == 1
+
+    assert len(load_result.failures) == 1
+
+    failure = load_result.failures[0]
+
+    assert (
+        failure.submission_reference
+        == raw_submission["_uuid"]
+    )
+
+    assert (
+        failure.error
+        == "Simulated integrity constraint violation."
+    )
