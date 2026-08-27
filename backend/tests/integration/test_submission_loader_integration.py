@@ -161,6 +161,7 @@ def test_valid_submission_is_persisted(
     assert activity.female_participants == 40
         
         
+        
 def test_duplicate_submission_is_skipped(
     db_session: Session,
 ) -> None:
@@ -168,58 +169,47 @@ def test_duplicate_submission_is_skipped(
     Verify that processing the same Kobo submission twice does not
     create duplicate database records.
     """
-    
-    # 1. Clear session cache to guarantee isolation from previous tests
     db_session.rollback()
 
     raw_submission = create_unique_submission()
-
     external_submission_id = raw_submission["_uuid"]
 
     validator = SubmissionValidationService()
-
     loader = SubmissionLoader()
 
-    pipeline_result = validator.process(
-        [raw_submission]
-    )
-
+    # --- 1. First Load Attempt (Should succeed) ---
+    pipeline_result = validator.process([raw_submission])
     first_result = loader.load(
         session=db_session,
         pipeline_result=pipeline_result,
     )
-
     assert first_result.accepted_inserted == 1
-    
-    # Force save the first record to disk so rollback won't erase it
-    db_session.commit()
+    db_session.flush()  # Push the first record to the database memory layout
 
-    second_pipeline_result = validator.process(
-        [raw_submission]
-    )
+    # --- 2. Protect the Session with a Savepoint Block ---
+    # This creates a nested transaction boundary. If the loader rolls back 
+    # inside this block, it only rolls back to this exact point, preserving the first insert.
+    with db_session.begin_nested():
+        second_pipeline_result = validator.process([raw_submission])
+        second_result = loader.load(
+            session=db_session,
+            pipeline_result=second_pipeline_result,
+        )
 
-    second_result = loader.load(
-        session=db_session,
-        pipeline_result=second_pipeline_result,
-    )
-
+    # --- 3. Duplicate Handling Assertions ---
     assert second_result.accepted_inserted == 0
-
     assert second_result.skipped_records == 1
-
     assert second_result.failed_records == 0
-    
-    # Commit to clear transaction state and make inserted record visible
-    db_session.commit()
-    
+
+    # --- 4. Final Verification Check ---
     raw_submissions = db_session.scalars(
         select(RawSubmission).where(
-            RawSubmission.external_submission_id
-            == external_submission_id
+            RawSubmission.external_submission_id == external_submission_id
         )
     ).all()
 
     assert len(raw_submissions) == 1
+
     
         
 def test_rejected_submission_is_preserved_with_issue(
