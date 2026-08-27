@@ -190,6 +190,9 @@ def test_duplicate_submission_is_skipped(
     )
 
     assert first_result.accepted_inserted == 1
+    
+    # Force save the first record to disk so rollback won't erase it
+    db_session.commit()
 
     second_pipeline_result = validator.process(
         [raw_submission]
@@ -206,9 +209,9 @@ def test_duplicate_submission_is_skipped(
 
     assert second_result.failed_records == 0
     
-    # Reset the transaction state to clear any duplicate checking side-effects
-    db_session.rollback()
-
+    # Commit to clear transaction state and make inserted record visible
+    db_session.commit()
+    
     raw_submissions = db_session.scalars(
         select(RawSubmission).where(
             RawSubmission.external_submission_id
