@@ -154,10 +154,11 @@ class SubmissionLoader:
         submission = accepted_submission.submission
 
         try:
-            status = self._load_accepted(
-                session=session,
-                accepted_submission=accepted_submission,
-            )
+            with session.begin_nested():
+                status = self._load_accepted(
+                    session=session,
+                    accepted_submission=accepted_submission,
+                    )
 
             if status == "inserted":
                 session.commit()
@@ -168,7 +169,6 @@ class SubmissionLoader:
                 result.skipped_records += 1
 
         except IntegrityError as error:
-            session.rollback()
 
             result.failed_records += 1
 
@@ -182,7 +182,6 @@ class SubmissionLoader:
             )
 
         except Exception as error:
-            session.rollback()
 
             result.failed_records += 1
 
@@ -207,10 +206,11 @@ class SubmissionLoader:
         """
 
         try:
-            status = self._load_rejected(
-                session=session,
-                rejected_submission=rejected_submission,
-            )
+            with session.begin_nested():
+                status = self._load_rejected(
+                    session=session,
+                    rejected_submission=rejected_submission,
+                    )
 
             if status == "persisted":
                 session.commit()
@@ -221,7 +221,6 @@ class SubmissionLoader:
                 result.skipped_records += 1
 
         except IntegrityError as error:
-            session.rollback()
 
             result.failed_records += 1
 
@@ -238,7 +237,6 @@ class SubmissionLoader:
             )
 
         except Exception as error:
-            session.rollback()
 
             result.failed_records += 1
 
