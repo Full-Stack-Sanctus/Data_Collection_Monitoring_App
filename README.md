@@ -851,10 +851,10 @@ This helps ensure that changes are tested before being merged or deployed.
 
 ## Phase 7 — SQL Monitoring Layer
 
-* [ ] Create reporting views
-* [ ] Create performance queries
-* [ ] Calculate monitoring indicators
-* [ ] Create summary tables
+* [x] Create reporting views
+* [x] Create performance queries
+* [x] Calculate monitoring indicators
+* [x] Create summary tables
 
 ## Phase 8 — REST API
 
