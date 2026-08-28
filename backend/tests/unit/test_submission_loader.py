@@ -26,7 +26,7 @@ def test_load_result_counts_valid_submission(
 
     loader = SubmissionLoader()
 
-    mock_session = mocker.Mock()
+    mock_session = mocker.MagicMock()
 
     mocker.patch.object(
         loader,
@@ -49,7 +49,11 @@ def test_load_result_counts_valid_submission(
 
     assert result.failed_records == 0
 
+    mock_session.begin_nested.assert_called_once()
+
     mock_session.commit.assert_called_once()
+
+    mock_session.rollback.assert_not_called()
     
 
 def test_load_skips_duplicate_submission(
@@ -61,7 +65,7 @@ def test_load_skips_duplicate_submission(
     already exists.
 
     A skipped record does not represent a database failure, so the
-    transaction must not be rolled back.
+    transaction must not be committed or rolled back.
     """
 
     validator = SubmissionValidationService()
@@ -72,7 +76,7 @@ def test_load_skips_duplicate_submission(
 
     loader = SubmissionLoader()
 
-    mock_session = mocker.Mock()
+    mock_session = mocker.MagicMock()
 
     mocker.patch.object(
         loader,
@@ -92,6 +96,8 @@ def test_load_skips_duplicate_submission(
     assert result.skipped_records == 1
 
     assert result.failed_records == 0
+
+    mock_session.begin_nested.assert_called_once()
 
     mock_session.commit.assert_not_called()
 
@@ -117,7 +123,7 @@ def test_load_result_counts_rejected_submission(
 
     loader = SubmissionLoader()
 
-    mock_session = mocker.Mock()
+    mock_session = mocker.MagicMock()
 
     mocker.patch.object(
         loader,
@@ -138,7 +144,11 @@ def test_load_result_counts_rejected_submission(
 
     assert result.failed_records == 0
 
+    mock_session.begin_nested.assert_called_once()
+
     mock_session.commit.assert_called_once()
+
+    mock_session.rollback.assert_not_called()
 
 
 def test_database_failure_does_not_stop_processing(
@@ -147,6 +157,8 @@ def test_database_failure_does_not_stop_processing(
     """
     Verify that one unexpected database failure does not prevent
     the remaining submissions from being processed.
+
+    Each submission is isolated using its own nested transaction.
     """
 
     validator = SubmissionValidationService()
@@ -168,7 +180,7 @@ def test_database_failure_does_not_stop_processing(
 
     loader = SubmissionLoader()
 
-    mock_session = mocker.Mock()
+    mock_session = mocker.MagicMock()
 
     mocker.patch.object(
         loader,
@@ -190,9 +202,24 @@ def test_database_failure_does_not_stop_processing(
 
     assert result.accepted_inserted == 1
 
+    assert result.rejected_persisted == 0
+
+    assert result.skipped_records == 0
+
     assert len(result.failures) == 1
 
     assert (
         result.failures[0].submission_reference
         == "submission-uuid-123"
     )
+
+    assert (
+        result.failures[0].error
+        == "Database unavailable"
+    )
+
+    assert mock_session.begin_nested.call_count == 2
+
+    mock_session.commit.assert_called_once()
+
+    mock_session.rollback.assert_not_called()
