@@ -625,3 +625,164 @@ def test_integrity_error_is_recorded(
         failure.error
         == "Simulated integrity constraint violation."
     )
+    
+
+def test_savepoint_rolls_back_only_failed_submission(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify that a failure occurring after database persistence has
+    started rolls back only the failing submission.
+
+    This test proves that the nested transaction used for each
+    submission isolates the failed record from other successfully
+    processed records.
+
+    Expected outcome:
+
+        First submission
+            -> persisted successfully
+
+        Second submission
+            -> RawSubmission creation begins
+            -> simulated failure occurs
+            -> nested transaction rolls back
+
+        Third submission
+            -> persisted successfully
+
+    The final database state must contain the first and third
+    submissions, but not the failed second submission.
+    """
+
+    first_submission = create_unique_submission()
+    failing_submission = create_unique_submission()
+    successful_submission = create_unique_submission()
+
+    first_submission_id = first_submission["_uuid"]
+    failing_submission_id = failing_submission["_uuid"]
+    successful_submission_id = successful_submission["_uuid"]
+
+    validator = SubmissionValidationService()
+
+    pipeline_result = validator.process(
+        [
+            first_submission,
+            failing_submission,
+            successful_submission,
+        ]
+    )
+
+    assert pipeline_result.total_records == 3
+    assert pipeline_result.accepted_count == 3
+
+    loader = SubmissionLoader()
+
+    original_create = loader.raw_submission_repository.create
+
+    def create_then_fail_for_one_submission(
+        session: Session,
+        *,
+        source: str,
+        external_submission_id: str,
+        payload: dict,
+        retrieved_at,
+        processing_status: str = "pending",
+    ):
+        """
+        Allow RawSubmission persistence to begin normally.
+
+        For the designated failing submission, raise an exception
+        after the repository has already added the record to the
+        SQLAlchemy session.
+
+        The nested transaction must roll back this partial database
+        work without affecting the surrounding submissions.
+        """
+
+        raw_submission = original_create(
+            session,
+            source=source,
+            external_submission_id=external_submission_id,
+            payload=payload,
+            retrieved_at=retrieved_at,
+            processing_status=processing_status,
+        )
+
+        if external_submission_id == failing_submission_id:
+            raise RuntimeError(
+                "Simulated failure after persistence began."
+            )
+
+        return raw_submission
+
+    monkeypatch.setattr(
+        loader.raw_submission_repository,
+        "create",
+        create_then_fail_for_one_submission,
+    )
+
+    load_result = loader.load(
+        session=db_session,
+        pipeline_result=pipeline_result,
+    )
+
+    assert load_result.total_records == 3
+    assert load_result.accepted_inserted == 2
+    assert load_result.rejected_persisted == 0
+    assert load_result.skipped_records == 0
+    assert load_result.failed_records == 1
+
+    assert len(load_result.failures) == 1
+
+    failure = load_result.failures[0]
+
+    assert failure.submission_reference == failing_submission_id
+
+    assert (
+        failure.error
+        == "Simulated failure after persistence began."
+    )
+
+    persisted_first_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == first_submission_id
+        )
+    )
+
+    persisted_failing_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == failing_submission_id
+        )
+    )
+
+    persisted_successful_submission = db_session.scalar(
+        select(RawSubmission).where(
+            RawSubmission.external_submission_id
+            == successful_submission_id
+        )
+    )
+
+    assert persisted_first_submission is not None
+    assert persisted_failing_submission is None
+    assert persisted_successful_submission is not None
+
+    first_activity = db_session.scalar(
+        select(Activity).where(
+            Activity.raw_submission_id
+            == persisted_first_submission.id
+        )
+    )
+
+    successful_activity = db_session.scalar(
+        select(Activity).where(
+            Activity.raw_submission_id
+            == persisted_successful_submission.id
+        )
+    )
+
+    assert first_activity is not None
+    assert successful_activity is not None
