@@ -1,25 +1,32 @@
 from fastapi import FastAPI
 
-from app.core.config import settings
-from app.database.health import check_database_connection
+from app.api.router import api_router
+from app.api.routes.health import router as health_router
 
 
-app = FastAPI(
-    title=settings.app_name,
-    version="0.1.0",
-)
-
-
-@app.get("/health")
-async def health_check():
+def create_application() -> FastAPI:
     """
-    Return the application health status.
+    Create and configure the FastAPI application.
     """
 
-    database_connected = check_database_connection()
+    application = FastAPI(
+        title="Digital Data Collection and Program Monitoring System",
+        version="1.0.0",
+        description=(
+            "REST API for digital data collection, "
+            "data quality management, and program monitoring."
+        ),
+    )
 
-    return {
-        "status": "healthy" if database_connected else "degraded",
-        "environment": settings.app_env,
-        "database": "connected" if database_connected else "disconnected",
-    }
+    application.include_router(
+        health_router,
+    )
+
+    application.include_router(
+        api_router,
+    )
+
+    return application
+
+
+app = create_application()

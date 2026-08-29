@@ -4,3 +4,4 @@ pytest
 pytest-asyncio
 ruff
 pytest-mock
+httpx

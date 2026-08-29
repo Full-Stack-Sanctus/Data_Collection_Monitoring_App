@@ -1,10 +1,24 @@
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.database.session import (
     SessionLocal,
     engine,
 )
+from app.main import app
+
+
+@pytest.fixture
+def client() -> TestClient:
+    """
+    Provide a FastAPI test client.
+
+    The client exercises the application through the same HTTP
+    interface used by real API consumers.
+    """
+
+    return TestClient(app)
 
 
 @pytest.fixture
@@ -23,11 +37,8 @@ def db_session() -> Session:
 
     Each test runs inside an outer database transaction.
 
-    The application code can call session.commit() normally, while
-    the outer transaction is rolled back after the test completes.
-
-    This prevents integration tests from permanently modifying the
-    development database.
+    Application code may call session.commit() normally, but the
+    outer transaction is rolled back after the test completes.
     """
 
     connection = engine.connect()
@@ -44,7 +55,6 @@ def db_session() -> Session:
     finally:
         session.close()
 
-        if transaction.is_active:
-            transaction.rollback()
+        transaction.rollback()
 
         connection.close()
