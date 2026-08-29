@@ -1,3 +1,4 @@
+# Fixed version of tests/api/test_health.py
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.core.config import settings
@@ -5,10 +6,10 @@ from app.core.config import settings
 
 def test_liveness_check_endpoint(client: TestClient) -> None:
     """
-    Verify that the liveness check endpoint returns a 200 OK status code
-    and confirms the API instance is up and running.
+    Verify that the liveness check endpoint returns a 200 OK status code.
     """
-    response = client.get("/api/v1/health/live")
+    # Changed from "/api/v1/health/live" to "/health/live"
+    response = client.get("/health/live")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -19,13 +20,12 @@ def test_readiness_check_healthy(
     mock_check_db: patch, client: TestClient
 ) -> None:
     """
-    Verify that the readiness check endpoint reports a healthy status
-    when the database connection is functional.
+    Verify that the readiness check endpoint reports a healthy status.
     """
-    # Force the database check to return True
     mock_check_db.return_value = True
 
-    response = client.get("/api/v1/health/ready")
+    # Changed from "/api/v1/health/ready" to "/health/ready"
+    response = client.get("/health/ready")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -40,13 +40,12 @@ def test_readiness_check_degraded(
     mock_check_db: patch, client: TestClient
 ) -> None:
     """
-    Verify that the readiness check endpoint reports a degraded status
-    when the database connection fails.
+    Verify that the readiness check endpoint reports a degraded status.
     """
-    # Force the database check to return False
     mock_check_db.return_value = False
 
-    response = client.get("/api/v1/health/ready")
+    # Changed from "/api/v1/health/ready" to "/health/ready"
+    response = client.get("/health/ready")
 
     assert response.status_code == 200
     assert response.json() == {
