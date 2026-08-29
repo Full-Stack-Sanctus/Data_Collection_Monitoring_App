@@ -13,10 +13,17 @@ from app.services.monitoring_service import (
     MonitoringService,
 )
 
+from app.api.dependencies.auth import (
+    require_api_key,
+)
+
 
 router = APIRouter(
-    prefix="/monitoring",
+    prefix="/api/monitoring",
     tags=["Monitoring"],
+    dependencies=[
+        Depends(require_api_key),
+    ],
 )
 
 

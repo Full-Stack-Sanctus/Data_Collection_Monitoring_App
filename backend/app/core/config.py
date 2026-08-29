@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     are loaded from the .env file and must never be committed to Git.
     """
 
-    app_name: str = "Digital Data Collection & Program Monitoring System"
+    app_name: str = (
+        "Digital Data Collection & Program Monitoring System"
+    )
 
     app_env: str = "development"
 
@@ -23,9 +25,20 @@ class Settings(BaseSettings):
 
     database_url: str
 
+    # API authentication
+
+    api_key: str = Field(
+        default="",
+        min_length=0,
+    )
+
+    api_auth_enabled: bool = True
+
     # KoboToolbox API configuration
 
-    kobo_base_url: str = "https://kf.kobotoolbox.org"
+    kobo_base_url: str = (
+        "https://kf.kobotoolbox.org"
+    )
 
     kobo_api_token: str
 
@@ -35,7 +48,7 @@ class Settings(BaseSettings):
         default=30,
         gt=0,
     )
-    
+
     data_directory: Path = (
         PROJECT_ROOT / "data"
     )
@@ -50,6 +63,3 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
-
-
-settings = Settings()
