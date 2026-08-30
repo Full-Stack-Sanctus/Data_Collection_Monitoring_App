@@ -7,3 +7,4 @@ alembic
 pandas
 httpx
 requests>=2.32,<3.0
+PyJWT

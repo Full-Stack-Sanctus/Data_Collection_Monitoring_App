@@ -10,9 +10,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     """
     Application configuration loaded from environment variables.
-
-    Sensitive values such as database credentials and Kobo API tokens
-    are loaded from the .env file and must never be committed to Git.
     """
 
     app_name: str = (
@@ -21,20 +18,38 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
 
-    debug: bool = True
+    debug: bool = False
 
     database_url: str
 
-    # API authentication
+    api_prefix: str = "/api"
 
-    api_key: str = Field(
-        default="",
-        min_length=0,
+    cors_origins: list[str] = Field(
+        default_factory=list,
     )
 
-    api_auth_enabled: bool = True
+    max_page_size: int = Field(
+        default=100,
+        gt=0,
+    )
 
-    # KoboToolbox API configuration
+    default_page_size: int = Field(
+        default=20,
+        gt=0,
+    )
+
+    # Authentication
+
+    jwt_secret_key: str
+
+    jwt_algorithm: str = "HS256"
+
+    jwt_access_token_expire_minutes: int = Field(
+        default=30,
+        gt=0,
+    )
+
+    # KoboToolbox
 
     kobo_base_url: str = (
         "https://kf.kobotoolbox.org"

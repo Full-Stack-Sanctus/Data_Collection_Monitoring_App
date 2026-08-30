@@ -17,12 +17,26 @@ from app.api.dependencies.auth import (
     require_api_key,
 )
 
+from typing import Annotated
+
+from app.schemas.auth import TokenPayload
+from app.security.dependencies import (
+    get_current_principal,
+)
+
 
 router = APIRouter(
     prefix="/api/monitoring",
     tags=["Monitoring"],
     dependencies=[
         Depends(require_api_key),
+        Depends(get_current_principal),
+        Depends(require_role(
+            "admin",
+            "analyst",
+            "viewer",
+            )
+        ),
     ],
 )
 
@@ -59,6 +73,14 @@ def get_monitoring_summary(
 @router.get(
     "/programs",
     response_model=list[ProgramPerformance],
+    summary="Get program performance",
+    description=(
+        "Return activity and participant performance metrics "
+        "grouped by program."
+    ),
+    response_description=(
+        "Program-level monitoring performance."
+    ),
 )
 def get_program_performance(
     session: Session = Depends(get_db),
@@ -76,6 +98,14 @@ def get_program_performance(
 @router.get(
     "/geography",
     response_model=list[GeographicPerformance],
+    summary="Get geographic performance",
+    description=(
+        "Return activity and participant performance metrics "
+        "grouped by state, LGA, and community."
+    ),
+    response_description=(
+        "Geographic monitoring performance."
+    ),
 )
 def get_geographic_performance(
     session: Session = Depends(get_db),
@@ -93,6 +123,14 @@ def get_geographic_performance(
 @router.get(
     "/data-quality",
     response_model=DataQualitySummary,
+    summary="Get program performance",
+    description=(
+        "Return activity and participant performance metrics "
+        "grouped by program."
+    ),
+    response_description=(
+        "Program-level monitoring performance."
+    ),
 )
 def get_data_quality_summary(
     session: Session = Depends(get_db),
@@ -110,6 +148,14 @@ def get_data_quality_summary(
 @router.get(
     "/data-quality/issues",
     response_model=list[DataQualityIssueBreakdown],
+    summary="Get data quality issue breakdown",
+    description=(
+        "Return data quality issues grouped by validation "
+        "rule and severity."
+    ),
+    response_description=(
+        "Data quality issue counts by rule and severity."
+    ),
 )
 def get_data_quality_issue_breakdown(
     session: Session = Depends(get_db),
