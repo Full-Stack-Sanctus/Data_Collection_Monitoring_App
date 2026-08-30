@@ -22,16 +22,18 @@ jobs:
       postgres:
         image: postgres:18-alpine
 
+        # FIXED: Use static configuration names instead of secrets context here
         env:
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: monitoring_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
 
         ports:
           - 5432:5432
 
+        # FIXED: Adjusted options command to use static strings matching the environment setup block above
         options: >-
-          --health-cmd "pg_isready -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }}"
+          --health-cmd "pg_isready -U postgres -d monitoring_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -72,12 +74,13 @@ jobs:
       # ----------------------------------------------------------
       - name: Run database migrations
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
-          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+          DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: monitoring_test
 
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
@@ -90,12 +93,13 @@ jobs:
       # ----------------------------------------------------------
       - name: Run unit and integration tests
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
-          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+          DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: monitoring_test
 
           KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
@@ -110,23 +114,16 @@ jobs:
 
       # ----------------------------------------------------------
       # 6. Execute real data pipeline
-      #
-      # Extraction
-      #     ↓
-      # Transformation
-      #     ↓
-      # Validation
-      #     ↓
-      # Loading
       # ----------------------------------------------------------
       - name: Run data pipeline
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
-          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+          DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: monitoring_test
 
           KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
@@ -144,12 +141,13 @@ jobs:
       # ----------------------------------------------------------
       - name: Verify monitoring aggregates
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
-          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+          DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: monitoring_test
 
           KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
@@ -164,8 +162,6 @@ jobs:
 
   # ============================================================
   # JOB 2: BUILD AND PUSH DOCKER IMAGE
-  #
-  # THIS JOB CANNOT RUN UNLESS JOB 1 PASSES.
   # ============================================================
   build-and-push:
 
@@ -175,9 +171,6 @@ jobs:
 
     needs: test-and-pipeline
 
-    # Only publish images from pushes.
-    # Pull requests should test the code but should NOT
-    # publish an image to Docker Hub.
     if: github.event_name == 'push'
 
     steps:
