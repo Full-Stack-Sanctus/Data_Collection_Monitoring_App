@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copy application source
-COPY app ./app
+COPY app ./backend/app
 
 # Expose FastAPI port
 EXPOSE 8000
