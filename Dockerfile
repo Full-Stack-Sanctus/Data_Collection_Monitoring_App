@@ -13,18 +13,20 @@ RUN apt-get update \
        libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency file first.
-# This allows Docker to cache the dependency installation layer.
-COPY requirements.txt .
+# FIXED: Copy the dependency file out of the backend directory explicitly
+COPY backend/requirements.txt .
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy application source
-COPY app ./backend/app
+# FIXED: Copy the application source from the backend subfolder into /app
+COPY backend/app ./app
+
+# FIXED: Configure your PYTHONPATH so Python knows exactly where to load your 'app' module
+ENV PYTHONPATH=/app
 
 # Expose FastAPI port
 EXPOSE 8000
 
-# Start FastAPI using Uvicorn
+# FIXED: Start FastAPI using Uvicorn with the corrected application import path
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

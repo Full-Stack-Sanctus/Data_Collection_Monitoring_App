@@ -22,6 +22,7 @@ jobs:
       postgres:
         image: postgres:18-alpine
 
+        # FIXED: Use static configuration names instead of secrets context here
         env:
           POSTGRES_DB: monitoring_test
           POSTGRES_USER: postgres
@@ -30,6 +31,7 @@ jobs:
         ports:
           - 5432:5432
 
+        # FIXED: Adjusted options command to use static strings matching the environment setup block above
         options: >-
           --health-cmd "pg_isready -U postgres -d monitoring_test"
           --health-interval 10s
@@ -72,6 +74,7 @@ jobs:
       # ----------------------------------------------------------
       - name: Run database migrations
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -101,6 +104,7 @@ jobs:
       # ----------------------------------------------------------
       - name: Run unit and integration tests
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -119,6 +123,7 @@ jobs:
           API_AUTH_ENABLED: False
           API_KEY: ci_test_api_key_placeholder
 
+
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
 
@@ -130,6 +135,7 @@ jobs:
       # ----------------------------------------------------------
       - name: Run data pipeline
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -159,6 +165,7 @@ jobs:
       # ----------------------------------------------------------
       - name: Verify monitoring aggregates
         working-directory: backend
+        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -238,12 +245,16 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend          # FIXED: Looking inside the backend workspace folder
-          file: ./backend/Dockerfile  # FIXED: Pointing explicitly to the nested Dockerfile
+          context: .
+          file: ./Dockerfile
+
           push: true
+
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:${{ github.sha }}
+
           labels: ${{ steps.meta.outputs.labels }}
+
           cache-from: type=gha
           cache-to: type=gha,mode=max
