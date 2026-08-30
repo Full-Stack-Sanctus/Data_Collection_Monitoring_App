@@ -1,4 +1,7 @@
 import pytest
+
+import time
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -9,6 +12,7 @@ from app.main import app
 from app.api.dependencies.auth import require_api_key
 from app.security.dependencies import get_current_principal
 from app.schemas.auth import TokenPayload  # Imported to serve as mock contract
+
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +31,8 @@ def bypass_security_dependencies():
     mock_payload = TokenPayload(
         sub="ci-test-user-id",
         email="test@example.com",
-        role="admin"
+        role="admin",
+        exp=int(time.time()) + 3600  # Sets token expiration to 1 hour in the future
     )
     app.dependency_overrides[get_current_principal] = lambda: mock_payload
 
