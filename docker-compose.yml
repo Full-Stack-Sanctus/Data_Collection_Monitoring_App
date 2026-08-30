@@ -4,15 +4,51 @@ services:
     container_name: digital-monitoring-postgres
 
     environment:
-      POSTGRES_DB: monitoring_db
-      POSTGRES_USER: monitoring_user
-      POSTGRES_PASSWORD: monitoring_password
+      POSTGRES_DB: ${POSTGRES_DB:-monitoring_db}
+      POSTGRES_USER: ${POSTGRES_USER:-monitoring_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-monitoring_password}
 
     ports:
       - "5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-monitoring_user} -d ${POSTGRES_DB:-monitoring_db}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: digital-monitoring-api
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      APP_NAME: "Digital Data Collection and Monitoring System"
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-monitoring_user}:${POSTGRES_PASSWORD:-monitoring_password}@postgres:5432/${POSTGRES_DB:-monitoring_db}
+
+      KOBO_BASE_URL: ${KOBO_BASE_URL}
+      KOBO_API_TOKEN: ${KOBO_API_TOKEN}
+      KOBO_ASSET_UID: ${KOBO_ASSET_UID}
+      KOBO_REQUEST_TIMEOUT_SECONDS: ${KOBO_REQUEST_TIMEOUT_SECONDS:-30}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

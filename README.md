@@ -858,12 +858,12 @@ This helps ensure that changes are tested before being merged or deployed.
 
 ## Phase 8 — REST API
 
-* [ ] Build FastAPI application
-* [ ] Implement endpoints
-* [ ] Add filtering
-* [ ] Add request validation
-* [ ] Add API tests
-* [ ] Generate API documentation
+* [x] Build FastAPI application
+* [x] Implement endpoints
+* [x] Add filtering
+* [x] Add request validation
+* [x] Add API tests
+* [x] Generate API documentation
 
 ## Phase 9 — Power BI Dashboard
 

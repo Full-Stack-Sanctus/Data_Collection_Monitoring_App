@@ -1,0 +1,237 @@
+name: Run Integration, Unit Tests and Data Pipeline
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ============================================================
+  # JOB 1: TEST APPLICATION + RUN DATA PIPELINE
+  # ============================================================
+  test-and-pipeline:
+
+    name: Tests and Data Pipeline
+
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+
+        env:
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }}"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+
+      # ----------------------------------------------------------
+      # 1. Checkout source code
+      # ----------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ----------------------------------------------------------
+      # 2. Set up Python
+      # ----------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+
+      # ----------------------------------------------------------
+      # 3. Install dependencies
+      # ----------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+          pip install pytest pytest-asyncio alembic psycopg
+
+          pip install -r backend/requirements-dev.txt
+
+
+      # ----------------------------------------------------------
+      # 4. Run database migrations
+      # ----------------------------------------------------------
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+
+        run: |
+          export PYTHONPATH=$GITHUB_WORKSPACE/backend
+
+          alembic upgrade head
+
+
+      # ----------------------------------------------------------
+      # 5. Run complete automated test suite
+      # ----------------------------------------------------------
+      - name: Run unit and integration tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+
+          KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
+          KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
+          KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
+          KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
+
+        run: |
+          export PYTHONPATH=$GITHUB_WORKSPACE/backend
+
+          python -m pytest tests/ -v
+
+
+      # ----------------------------------------------------------
+      # 6. Execute real data pipeline
+      #
+      # Extraction
+      #     ↓
+      # Transformation
+      #     ↓
+      # Validation
+      #     ↓
+      # Loading
+      # ----------------------------------------------------------
+      - name: Run data pipeline
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+
+          KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
+          KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
+          KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
+          KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
+
+        run: |
+          export PYTHONPATH=$GITHUB_WORKSPACE/backend
+
+          python run_pipeline.py
+
+
+      # ----------------------------------------------------------
+      # 7. Verify monitoring aggregates
+      # ----------------------------------------------------------
+      - name: Verify monitoring aggregates
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+
+          KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
+          KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
+          KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
+          KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
+
+        run: |
+          export PYTHONPATH=$GITHUB_WORKSPACE/backend
+
+          python check_monitoring.py
+
+
+  # ============================================================
+  # JOB 2: BUILD AND PUSH DOCKER IMAGE
+  #
+  # THIS JOB CANNOT RUN UNLESS JOB 1 PASSES.
+  # ============================================================
+  build-and-push:
+
+    name: Build and Push Docker Image
+
+    runs-on: ubuntu-latest
+
+    needs: test-and-pipeline
+
+    # Only publish images from pushes.
+    # Pull requests should test the code but should NOT
+    # publish an image to Docker Hub.
+    if: github.event_name == 'push'
+
+    steps:
+
+      # ----------------------------------------------------------
+      # 1. Checkout repository
+      # ----------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ----------------------------------------------------------
+      # 2. Set up Docker Buildx
+      # ----------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+
+      # ----------------------------------------------------------
+      # 3. Login to Docker Hub
+      # ----------------------------------------------------------
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+
+      # ----------------------------------------------------------
+      # 4. Generate Docker image metadata
+      # ----------------------------------------------------------
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring
+
+
+      # ----------------------------------------------------------
+      # 5. Build and push Docker image
+      # ----------------------------------------------------------
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+
+          push: true
+
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:${{ github.sha }}
+
+          labels: ${{ steps.meta.outputs.labels }}
+
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
