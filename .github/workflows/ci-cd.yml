@@ -90,7 +90,7 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           
           # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: "false"
+          API_AUTH_ENABLED: False
           API_KEY: ci_test_api_key_placeholder
 
         run: |
@@ -120,7 +120,7 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           
           # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: "false"
+          API_AUTH_ENABLED: False
           API_KEY: ci_test_api_key_placeholder
 
 
@@ -151,7 +151,7 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           
           # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: "false"
+          API_AUTH_ENABLED: False
           API_KEY: ci_test_api_key_placeholder
 
         run: |
@@ -181,7 +181,7 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           
           # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: "false"
+          API_AUTH_ENABLED: False
           API_KEY: ci_test_api_key_placeholder
 
         run: |

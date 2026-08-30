@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -83,17 +83,6 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
-    
-    @field_validator("api_auth_enabled", mode="before")
-    @classmethod
-    def parse_bool_env_strings(cls, v: any) -> bool:
-        """
-        Ensure string configurations like 'false', 'False', or '0'
-        are evaluated cleanly as False booleans in CI/CD container runs.
-        """
-        if isinstance(v, str):
-            return v.lower() not in ("false", "0", "f", "no", "n")
-        return bool(v)
         
     
 settings = Settings()
