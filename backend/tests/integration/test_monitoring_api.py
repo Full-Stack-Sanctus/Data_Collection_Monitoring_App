@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_db
+from app.api.dependencies.database import get_db
 from app.main import app
 
 
