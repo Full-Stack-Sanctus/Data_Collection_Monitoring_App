@@ -25,6 +25,9 @@ from app.security.dependencies import (
 )
 
 
+from app.security.authorization import require_role
+
+
 router = APIRouter(
     prefix="/api/monitoring",
     tags=["Monitoring"],
