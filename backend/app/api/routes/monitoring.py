@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db
+from app.api.dependencies.database import get_db
 from app.schemas.monitoring import (
     DataQualityIssueBreakdown,
     DataQualitySummary,
