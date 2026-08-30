@@ -29,7 +29,7 @@ from app.security.authorization import require_role
 
 
 router = APIRouter(
-    prefix="/api/monitoring",
+    prefix="/monitoring",
     tags=["Monitoring"],
     dependencies=[
         Depends(require_api_key),
