@@ -37,6 +37,11 @@ class Settings(BaseSettings):
         default=20,
         gt=0,
     )
+    
+    # This instructs Pydantic to search your environment block for these keys on boot.
+    api_auth_enabled: bool
+    api_key: str | None = None  # Optional type, but can be forced via validation if enabled
+    
 
     # Authentication
 

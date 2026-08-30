@@ -88,7 +88,10 @@ jobs:
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
           
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-
+          
+          # Force authentication to be disabled safely inside the test runner environment
+          API_AUTH_ENABLED: "false"
+          API_KEY: ci_test_api_key_placeholder
 
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
@@ -115,6 +118,11 @@ jobs:
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
           
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          
+          # Force authentication to be disabled safely inside the test runner environment
+          API_AUTH_ENABLED: "false"
+          API_KEY: ci_test_api_key_placeholder
+
 
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
@@ -141,6 +149,10 @@ jobs:
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
           
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          
+          # Force authentication to be disabled safely inside the test runner environment
+          API_AUTH_ENABLED: "false"
+          API_KEY: ci_test_api_key_placeholder
 
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
@@ -167,6 +179,10 @@ jobs:
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
           
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          
+          # Force authentication to be disabled safely inside the test runner environment
+          API_AUTH_ENABLED: "false"
+          API_KEY: ci_test_api_key_placeholder
 
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
