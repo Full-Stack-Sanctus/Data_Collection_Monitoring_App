@@ -1,0 +1,19 @@
+services:
+  api:
+    image: ${DOCKERHUB_USERNAME}/digital-data-monitoring:${IMAGE_TAG:-latest}
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+      KOBO_BASE_URL: ${KOBO_BASE_URL}
+      KOBO_API_TOKEN: ${KOBO_API_TOKEN}
+      KOBO_ASSET_UID: ${KOBO_ASSET_UID}
+
+    restart: unless-stopped

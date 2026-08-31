@@ -10,7 +10,8 @@ permissions:
 jobs:
 
   # ============================================================
-  # JOB 1: TEST APPLICATION + RUN DATA PIPELINE
+  # JOB 1
+  # TEST APPLICATION + RUN DATA PIPELINE
   # ============================================================
   test-and-pipeline:
 
@@ -22,7 +23,6 @@ jobs:
       postgres:
         image: postgres:18-alpine
 
-        # FIXED: Use static configuration names instead of secrets context here
         env:
           POSTGRES_DB: monitoring_test
           POSTGRES_USER: postgres
@@ -31,7 +31,6 @@ jobs:
         ports:
           - 5432:5432
 
-        # FIXED: Adjusted options command to use static strings matching the environment setup block above
         options: >-
           --health-cmd "pg_isready -U postgres -d monitoring_test"
           --health-interval 10s
@@ -41,14 +40,14 @@ jobs:
     steps:
 
       # ----------------------------------------------------------
-      # 1. Checkout source code
+      # 1. Checkout
       # ----------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
 
       # ----------------------------------------------------------
-      # 2. Set up Python
+      # 2. Python
       # ----------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,27 +69,25 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # 4. Run database migrations
+      # 4. Database migrations
       # ----------------------------------------------------------
       - name: Run database migrations
         working-directory: backend
-        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres_password
           POSTGRES_DB: monitoring_test
-          
+
           KOBO_API_TOKEN: ${{ secrets.KOBO_API_TOKEN }}
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
           KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
-          
+
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-          
-          # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: False
+
+          API_AUTH_ENABLED: "False"
           API_KEY: ci_test_api_key_placeholder
 
         run: |
@@ -100,11 +97,10 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # 5. Run complete automated test suite
+      # 5. Unit + integration tests
       # ----------------------------------------------------------
       - name: Run unit and integration tests
         working-directory: backend
-        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -116,13 +112,11 @@ jobs:
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
           KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
-          
-          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-          
-          # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: False
-          API_KEY: ci_test_api_key_placeholder
 
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+
+          API_AUTH_ENABLED: "False"
+          API_KEY: ci_test_api_key_placeholder
 
         run: |
           export PYTHONPATH=$GITHUB_WORKSPACE/backend
@@ -131,11 +125,10 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # 6. Execute real data pipeline
+      # 6. Data pipeline
       # ----------------------------------------------------------
       - name: Run data pipeline
         working-directory: backend
-        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -147,11 +140,10 @@ jobs:
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
           KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
-          
+
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-          
-          # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: False
+
+          API_AUTH_ENABLED: "False"
           API_KEY: ci_test_api_key_placeholder
 
         run: |
@@ -161,11 +153,10 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # 7. Verify monitoring aggregates
+      # 7. Monitoring verification
       # ----------------------------------------------------------
       - name: Verify monitoring aggregates
         working-directory: backend
-        # FIXED: Replaced service secrets connections with matching internal static strings
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres_password@localhost:5432/monitoring_test
 
@@ -177,11 +168,10 @@ jobs:
           KOBO_ASSET_UID: ${{ secrets.KOBO_ASSET_UID }}
           KOBO_BASE_URL: ${{ secrets.KOBO_BASE_URL }}
           KOBO_REQUEST_TIMEOUT_SECONDS: ${{ secrets.KOBO_REQUEST_TIMEOUT_SECONDS }}
-          
+
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-          
-          # Force authentication to be disabled safely inside the test runner environment
-          API_AUTH_ENABLED: False
+
+          API_AUTH_ENABLED: "False"
           API_KEY: ci_test_api_key_placeholder
 
         run: |
@@ -191,7 +181,8 @@ jobs:
 
 
   # ============================================================
-  # JOB 2: BUILD AND PUSH DOCKER IMAGE
+  # JOB 2
+  # BUILD + PUSH PRODUCTION IMAGE
   # ============================================================
   build-and-push:
 
@@ -201,6 +192,7 @@ jobs:
 
     needs: test-and-pipeline
 
+    # Never publish Docker images from pull requests.
     if: github.event_name == 'push'
 
     steps:
@@ -213,14 +205,7 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # 2. Set up Docker Buildx
-      # ----------------------------------------------------------
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-
-      # ----------------------------------------------------------
-      # 3. Login to Docker Hub
+      # 2. Login to Docker Hub
       # ----------------------------------------------------------
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -230,31 +215,45 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # 4. Generate Docker image metadata
+      # 3. Set Docker image variables
       # ----------------------------------------------------------
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring
+      - name: Set Docker image variables
+        run: |
+          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
 
 
       # ----------------------------------------------------------
-      # 5. Build and push Docker image
+      # 4. Build production image through Docker Compose
       # ----------------------------------------------------------
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
+      - name: Build production image with Docker Compose
+        run: |
+          docker compose -f production-docker-compose.yml build api
 
-          push: true
 
-          tags: |
+      # ----------------------------------------------------------
+      # 5. Tag image as latest
+      # ----------------------------------------------------------
+      - name: Tag image as latest
+        run: |
+          docker tag \
+            ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:${GITHUB_SHA} \
             ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:${{ github.sha }}
 
-          labels: ${{ steps.meta.outputs.labels }}
 
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # ----------------------------------------------------------
+      # 6. Push immutable commit image
+      # ----------------------------------------------------------
+      - name: Push commit image
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:${GITHUB_SHA}
+
+
+      # ----------------------------------------------------------
+      # 7. Push latest image
+      # ----------------------------------------------------------
+      - name: Push latest image
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/digital-data-monitoring:latest
