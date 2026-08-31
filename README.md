@@ -867,7 +867,7 @@ This helps ensure that changes are tested before being merged or deployed.
 
 ## Phase 9 — Power BI Dashboard
 
-* [ ] Build data model
+* [x] Build data model
 * [ ] Create DAX measures
 * [ ] Build executive dashboard
 * [ ] Build program performance dashboard
